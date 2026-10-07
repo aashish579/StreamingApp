@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chat
+spec:
+  replicas: {{ .Values.services.chat.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: chat
+  template:
+    metadata:
+      labels:
+        app: chat
+    spec:
+      containers:
+        - name: chat
+          image: "{{ .Values.services.chat.image }}:{{ .Values.services.chat.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.services.chat.port }}
+          env:
+            - name: PORT
+              value: {{ .Values.services.chat.port | quote }}
+            - name: MONGO_URI
+              value: "mongodb://mongo:{{ .Values.mongo.port }}/{{ .Values.mongo.database }}"
+          envFrom:
+            - configMapRef:
+                name: streamingapp-config
+            - secretRef:
+                name: streamingapp-secret
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: {{ .Values.services.chat.port }}
+            initialDelaySeconds: 8
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: {{ .Values.services.chat.port }}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+{{ toYaml .Values.resources.backend | indent 12 }}

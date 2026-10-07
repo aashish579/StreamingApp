@@ -1,0 +1,67 @@
+global:
+  imagePullPolicy: IfNotPresent
+
+services:
+  auth:
+    image: aashish579/streaming-auth
+    tag: "1.0.0"
+    replicas: 2
+    port: 3001
+  streaming:
+    image: aashish579/streaming-stream
+    tag: "1.0.0"
+    replicas: 2
+    port: 3002
+  admin:
+    image: aashish579/streaming-admin
+    tag: "1.0.0"
+    replicas: 2
+    port: 3003
+  chat:
+    image: aashish579/streaming-chat
+    tag: "1.0.0"
+    replicas: 2
+    port: 3004
+  frontend:
+    image: aashish579/streaming-frontend
+    tag: "1.0.0"
+    replicas: 2
+    port: 80
+
+mongo:
+  image: mongo:6
+  port: 27017
+  storageSize: 5Gi
+  database: streamingapp
+
+config:
+  clientUrls: "http://localhost"
+  awsRegion: "us-east-1"
+  streamingPublicUrl: "http://localhost/api/streaming"
+
+secrets:
+  jwtSecret: "replace-before-demo"
+  awsAccessKeyId: ""
+  awsSecretAccessKey: ""
+  awsSessionToken: ""
+  awsS3Bucket: ""
+
+ingress:
+  enabled: true
+  host: localhost
+
+resources:
+  backend:
+    requests:
+      cpu: 50m
+      memory: 96Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  frontend:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi

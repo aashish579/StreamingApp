@@ -1,0 +1,5 @@
+.DS_Store
+.git
+.gitignore
+secrets.local.yaml
+*.tmp

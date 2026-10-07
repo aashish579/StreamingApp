@@ -1,0 +1,60 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: streamingapp-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/proxy-body-size: "500m"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /api/streaming
+            pathType: Prefix
+            backend:
+              service:
+                name: streaming-svc
+                port:
+                  number: 3002
+          - path: /api/admin
+            pathType: Prefix
+            backend:
+              service:
+                name: admin-svc
+                port:
+                  number: 3003
+          - path: /api/chat
+            pathType: Prefix
+            backend:
+              service:
+                name: chat-svc
+                port:
+                  number: 3004
+          # Socket.IO uses /socket.io by default. This route is required for live chat through Ingress.
+          - path: /socket.io
+            pathType: Prefix
+            backend:
+              service:
+                name: chat-svc
+                port:
+                  number: 3004
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: auth-svc
+                port:
+                  number: 3001
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-svc
+                port:
+                  number: 80
+{{- end }}

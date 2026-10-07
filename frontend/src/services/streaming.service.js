@@ -72,8 +72,8 @@ export const streamingService = {
       return buildPlaybackUrl(videoOrPath);
     }
     return buildPlaybackUrl(
-      videoOrPath.streamUrl ||
       videoOrPath.streamPath ||
+      videoOrPath.streamUrl ||
       `/api/streaming/stream/${videoOrPath._id}`,
     );
   },
