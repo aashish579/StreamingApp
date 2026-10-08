@@ -134,6 +134,50 @@ pipeline {
 
                         echo "All five images pushed to ECR with tag $ECR_TAG"
                     '''
+                        }
+                    }
+               }
+                           stage('Verify Amazon EKS Access') {
+            steps {
+                withCredentials([
+                    [
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'streamflix-aws-deploy',
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                    ],
+                    string(
+                        credentialsId: 'streamflix-aws-session-token',
+                        variable: 'AWS_SESSION_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        set +x
+                        set -eu
+
+                        unset AWS_PROFILE AWS_DEFAULT_PROFILE
+                        export AWS_DEFAULT_REGION=us-east-1
+
+                        ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+                        test "$ACCOUNT" = "710119225605"
+
+                        export KUBECONFIG="$WORKSPACE/.kubeconfig-streamflix"
+                        trap 'rm -f "$KUBECONFIG"' EXIT
+
+                        aws eks update-kubeconfig \
+                          --region us-east-1 \
+                          --name streamflix-eks \
+                          --kubeconfig "$KUBECONFIG"
+
+                        echo "Checking EKS access:"
+                        kubectl get nodes
+
+                        echo "Checking Helm release:"
+                        helm status streamflix -n default
+
+                        echo "Checking existing deployments:"
+                        kubectl get deployments -n default
+                    '''
                 }
             }
         }
