@@ -17,6 +17,9 @@ spec:
       labels:
         app: streaming
     spec:
+      {{- if .Values.aws.irsaEnabled }}
+      serviceAccountName: {{ .Values.aws.serviceAccountName }}
+      {{- end }}
       containers:
         - name: streaming
           image: "{{ .Values.services.streaming.image }}:{{ .Values.services.streaming.tag }}"

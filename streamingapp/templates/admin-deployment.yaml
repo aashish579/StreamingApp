@@ -17,6 +17,9 @@ spec:
       labels:
         app: admin
     spec:
+      {{- if .Values.aws.irsaEnabled }}
+      serviceAccountName: {{ .Values.aws.serviceAccountName }}
+      {{- end }}
       containers:
         - name: admin
           image: "{{ .Values.services.admin.image }}:{{ .Values.services.admin.tag }}"
