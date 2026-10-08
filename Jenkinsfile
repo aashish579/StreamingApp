@@ -65,7 +65,10 @@ pipeline {
                     sh 'docker push ${DOCKERHUB_USER}/streaming-admin:${IMAGE_TAG}'
                     sh 'docker push ${DOCKERHUB_USER}/streaming-chat:${IMAGE_TAG}'
                     sh 'docker push ${DOCKERHUB_USER}/streaming-frontend:${IMAGE_TAG}'
-
+                         }
+                    }
+              }
+      
         stage('Verify AWS Authentication') {
             steps {
                 withCredentials([[
