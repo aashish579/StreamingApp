@@ -62,35 +62,89 @@ pipeline {
       
 
         stage('Verify AWS Authentication') {
-    steps {
-        withCredentials([
-            [
-                $class: 'AmazonWebServicesCredentialsBinding',
-                credentialsId: 'streamflix-aws-deploy',
-                accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-                secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-            ],
-            string(
-                credentialsId: 'streamflix-aws-session-token',
-                variable: 'AWS_SESSION_TOKEN'
-            )
-        ]) {
-            sh '''
-                set +x
-                unset AWS_PROFILE AWS_DEFAULT_PROFILE
-                export AWS_DEFAULT_REGION=us-east-1
+            steps {
+                withCredentials([
+                    [
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'streamflix-aws-deploy',
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                    ],
+                    string(
+                        credentialsId: 'streamflix-aws-session-token',
+                        variable: 'AWS_SESSION_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        set +x
+                        unset AWS_PROFILE AWS_DEFAULT_PROFILE
+                        export AWS_DEFAULT_REGION=us-east-1
 
-                aws sts get-caller-identity \
-                  --query "{Account:Account,Arn:Arn}" \
-                  --output json
-            '''
+                        ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+
+                        echo "Authenticated AWS account: $ACCOUNT"
+
+                        test "$ACCOUNT" = "710119225605"
+                    '''
+                }
+            }
+        }
+
+        stage('Push Images to Amazon ECR') {
+            steps {
+                withCredentials([
+                    [
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'streamflix-aws-deploy',
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                    ],
+                    string(
+                        credentialsId: 'streamflix-aws-session-token',
+                        variable: 'AWS_SESSION_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        set +x
+                        set -e
+                        unset AWS_PROFILE AWS_DEFAULT_PROFILE
+
+                        AWS_REGION=us-east-1
+                        AWS_ACCOUNT=710119225605
+                        ECR_REGISTRY="$AWS_ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com"
+                        ECR_TAG="ci-$BUILD_NUMBER"
+
+                        ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+                        test "$ACCOUNT" = "$AWS_ACCOUNT"
+
+                        aws ecr get-login-password --region "$AWS_REGION" |
+                            docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+                        docker tag "$DOCKERHUB_USER/streaming-auth:$IMAGE_TAG" "$ECR_REGISTRY/streamflix-auth:$ECR_TAG"
+                        docker tag "$DOCKERHUB_USER/streaming-stream:$IMAGE_TAG" "$ECR_REGISTRY/streamflix-streaming:$ECR_TAG"
+                        docker tag "$DOCKERHUB_USER/streaming-admin:$IMAGE_TAG" "$ECR_REGISTRY/streamflix-admin:$ECR_TAG"
+                        docker tag "$DOCKERHUB_USER/streaming-chat:$IMAGE_TAG" "$ECR_REGISTRY/streamflix-chat:$ECR_TAG"
+                        docker tag "$DOCKERHUB_USER/streaming-frontend:$IMAGE_TAG" "$ECR_REGISTRY/streamflix-frontend:$ECR_TAG"
+
+                        docker push "$ECR_REGISTRY/streamflix-auth:$ECR_TAG"
+                        docker push "$ECR_REGISTRY/streamflix-streaming:$ECR_TAG"
+                        docker push "$ECR_REGISTRY/streamflix-admin:$ECR_TAG"
+                        docker push "$ECR_REGISTRY/streamflix-chat:$ECR_TAG"
+                        docker push "$ECR_REGISTRY/streamflix-frontend:$ECR_TAG"
+
+                        echo "All five images pushed to ECR with tag $ECR_TAG"
+                    '''
+                }
+            }
         }
     }
-}
-            }
- 
+
     post {
-        success { echo "StreamingApp CI completed successfully: ${IMAGE_TAG}" }
-        failure { echo 'StreamingApp CI failed. Review the stage logs above.' }
+        success {
+            echo "StreamingApp CI completed successfully: ${IMAGE_TAG}"
+        }
+        failure {
+            echo 'StreamingApp CI failed. Review the stage logs above.'
+        }
     }
 }
