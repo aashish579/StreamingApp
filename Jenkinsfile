@@ -59,7 +59,7 @@ pipeline {
                          }
                     }
               }
-      
+
 
         stage('Verify AWS Authentication') {
             steps {
@@ -137,7 +137,8 @@ pipeline {
                         }
                     }
                }
-                           stage('Verify Amazon EKS Access') {
+
+            stage('Verify Amazon EKS Access') {
             steps {
                 withCredentials([
                     [
@@ -178,6 +179,98 @@ pipeline {
                         echo "Checking existing deployments:"
                         kubectl get deployments -n default
                     '''
+                }
+            }
+        }
+
+        stage('Deploy to Amazon EKS') {
+
+            steps {
+                withCredentials([
+                    [
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'streamflix-aws-deploy',
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                    ],
+                    string(
+                        credentialsId: 'streamflix-aws-session-token',
+                        variable: 'AWS_SESSION_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        set +x
+                        set -eu
+                        unset AWS_PROFILE AWS_DEFAULT_PROFILE
+                        export AWS_DEFAULT_REGION=us-east-1
+
+                        ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+                        test "$ACCOUNT" = "710119225605"
+
+                        export KUBECONFIG="$WORKSPACE/.kubeconfig-streamflix"
+                        trap 'rm -f "$KUBECONFIG"' EXIT
+
+                        aws eks update-kubeconfig \
+                          --region us-east-1 \
+                          --name streamflix-eks \
+                          --kubeconfig "$KUBECONFIG"
+
+                        ECR_TAG="ci-$BUILD_NUMBER"
+                        echo "Deploying StreamFlix image tag: $ECR_TAG"
+
+                        # Confirm that the existing Helm release is available
+                        helm status streamflix -n default
+
+                        # Confirm MongoDB PVC remains bound
+                        PVC_PHASE=$(kubectl get pvc mongo-data-mongo-0 \
+                          -n default -o jsonpath='{.status.phase}')
+                        test "$PVC_PHASE" = "Bound"
+
+
+                        # Confirm the application JWT secret exists
+                        JWT_PRESENT=$(kubectl get secret streamingapp-secret \
+                          -n default -o jsonpath='{.data.JWT_SECRET}')
+                        test -n "$JWT_PRESENT"
+
+                        # Confirm the current StatefulSet storage configuration
+                        STORAGE_CLASS=$(kubectl get statefulset mongo \
+                          -n default \
+                          -o jsonpath='{.spec.volumeClaimTemplates[0].spec.storageClassName}')
+                        test "$STORAGE_CLASS" = "gp3"
+
+                        # Verify every image exists in ECR before deployment
+                        for SERVICE in auth streaming admin chat frontend; do
+                          aws ecr describe-images \
+                            --repository-name "streamflix-$SERVICE" \
+                            --image-ids "imageTag=$ECR_TAG" \
+                            --region us-east-1 \
+                            --query 'imageDetails[0].imageDigest' \
+                            --output text >/dev/null
+                        done
+
+                        # Upgrade the existing release without reinstalling MongoDB
+                        helm upgrade streamflix streamingapp \
+                          --namespace default \
+                          --reuse-values \
+                          --set-string services.auth.tag="$ECR_TAG" \
+                          --set-string services.streaming.tag="$ECR_TAG" \
+                          --set-string services.admin.tag="$ECR_TAG" \
+                          --set-string services.chat.tag="$ECR_TAG" \
+                          --set-string services.frontend.tag="$ECR_TAG" \
+                          --atomic \
+                          --wait \
+                          --timeout 10m
+
+                        # Verify all five deployments
+                        for SERVICE in auth streaming admin chat frontend; do
+                          kubectl rollout status deployment/"$SERVICE" \
+                            -n default --timeout=300s
+                        done
+
+                        echo "StreamFlix deployment completed: $ECR_TAG"
+                        kubectl get deployments -n default
+                    '''
+
                 }
             }
         }

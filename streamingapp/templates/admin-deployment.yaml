@@ -17,8 +17,11 @@ spec:
       labels:
         app: admin
     spec:
-      {{- if .Values.aws.irsaEnabled }}
-      serviceAccountName: {{ .Values.aws.serviceAccountName }}
+
+      {{- with .Values.aws }}
+      {{- if .irsaEnabled }}
+      serviceAccountName: {{ .serviceAccountName | quote }}
+      {{- end }}
       {{- end }}
       containers:
         - name: admin
