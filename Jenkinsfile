@@ -12,10 +12,14 @@ pipeline {
         }
 
         stage('Verify Tooling') {
-            steps {
-                sh 'docker --version'
-                sh 'kubectl version --client'
-                sh 'helm version --short'
+    steps {
+        sh 'docker --version'
+        sh 'kubectl version --client'
+        sh 'helm version --short'
+
+        sh 'command -v aws || true'
+        sh 'aws --version || true'
+        sh 'aws sts get-caller-identity || true'
             }
         }
 
