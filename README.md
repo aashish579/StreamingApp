@@ -136,3 +136,7 @@ Automated tests are not yet included. Recommended smoke checks:
 ## License
 
 MIT © StreamFlix Team
+
+## DevOps Deployment on Amazon EKS
+
+For Jenkins CI/CD, Docker, Amazon ECR, Kubernetes, Helm, MongoDB persistence and CloudWatch monitoring, see [Deployment Documentation](docs/DEPLOYMENT.md).
