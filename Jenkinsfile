@@ -65,6 +65,19 @@ pipeline {
                     sh 'docker push ${DOCKERHUB_USER}/streaming-admin:${IMAGE_TAG}'
                     sh 'docker push ${DOCKERHUB_USER}/streaming-chat:${IMAGE_TAG}'
                     sh 'docker push ${DOCKERHUB_USER}/streaming-frontend:${IMAGE_TAG}'
+
+        stage('Verify AWS Authentication') {
+            steps {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'streamflix-aws-deploy'
+                ]]) {
+                    sh '''
+                        set +x
+                        aws sts get-caller-identity \
+                          --query "{Account:Account,Arn:Arn}" \
+                          --output json
+                    '''
                 }
             }
         }
