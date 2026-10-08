@@ -17,16 +17,7 @@ pipeline {
         sh 'kubectl version --client'
         sh 'helm version --short'
 
-        sh '''
-            echo "Checking AWS CLI:"
-            aws --version
-
-            echo "Checking AWS credential source:"
-            aws configure list
-
-            echo "Checking AWS authentication:"
-            aws sts get-caller-identity || true
-        '''
+        sh 'aws --version'
             }
         }
 
@@ -69,23 +60,35 @@ pipeline {
                     }
               }
       
+
         stage('Verify AWS Authentication') {
-            steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'streamflix-aws-deploy'
-                ]]) {
-                    sh '''
-                        set +x
-                        aws sts get-caller-identity \
-                          --query "{Account:Account,Arn:Arn}" \
-                          --output json
-                    '''
-                }
-            }
+    steps {
+        withCredentials([
+            [
+                $class: 'AmazonWebServicesCredentialsBinding',
+                credentialsId: 'streamflix-aws-deploy',
+                accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+            ],
+            string(
+                credentialsId: 'streamflix-aws-session-token',
+                variable: 'AWS_SESSION_TOKEN'
+            )
+        ]) {
+            sh '''
+                set +x
+                unset AWS_PROFILE AWS_DEFAULT_PROFILE
+                export AWS_DEFAULT_REGION=us-east-1
+
+                aws sts get-caller-identity \
+                  --query "{Account:Account,Arn:Arn}" \
+                  --output json
+            '''
         }
     }
-
+}
+            }
+ 
     post {
         success { echo "StreamingApp CI completed successfully: ${IMAGE_TAG}" }
         failure { echo 'StreamingApp CI failed. Review the stage logs above.' }
