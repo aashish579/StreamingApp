@@ -17,9 +17,16 @@ pipeline {
         sh 'kubectl version --client'
         sh 'helm version --short'
 
-        sh 'command -v aws || true'
-        sh 'aws --version || true'
-        sh 'aws sts get-caller-identity || true'
+        sh '''
+            echo "Checking AWS CLI:"
+            aws --version
+
+            echo "Checking AWS credential source:"
+            aws configure list
+
+            echo "Checking AWS authentication:"
+            aws sts get-caller-identity || true
+        '''
             }
         }
 
